@@ -21,6 +21,10 @@ pub struct PaneState {
     pub terminal_command: Option<String>,
     /// Raw output from `get_pane_running_command` for non-command panes.
     pub running_command: Option<String>,
+    pub host: Option<String>,
+    /// Used to delay adoption of a newly seen remote host by a small timeout.
+    /// Prevents tab name flickering for very short-lived remote commands.
+    pub pending_host: Option<String>,
     pub status: String,
     pub on_focus: Option<String>,
 }
@@ -218,6 +222,8 @@ mod tests {
                 program: Some("nvim".into()),
                 terminal_command: None,
                 running_command: None,
+                host: None,
+                pending_host: None,
                 status: DEFAULT_STATUS.to_string(),
                 on_focus: None,
             },
@@ -237,6 +243,8 @@ mod tests {
                 program: None,
                 terminal_command: None,
                 running_command: None,
+                host: None,
+                pending_host: None,
                 status: DEFAULT_STATUS.to_string(),
                 on_focus: None,
             },
@@ -263,6 +271,8 @@ mod tests {
             program: None,
             terminal_command: None,
             running_command: None,
+            host: None,
+            pending_host: None,
             status: DEFAULT_STATUS.to_string(),
             on_focus: None,
         }

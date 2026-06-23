@@ -81,6 +81,46 @@ pub fn tilde_path(path: &str, home: &str) -> String {
     path.to_string()
 }
 
+/// Extract a remote hostname from ssh/mosh/scp/rsync command lines.
+///
+/// Dumber parser: if the command is a remote tool, take the last non-option
+/// argument and clean it (strip user@ and :path). The "is it a persistent
+/// session or a fast one-shot?" decision is handled by a small adoption
+/// timeout in the caller (to prevent flickering), not here.
+pub fn extract_remote_host(cmd: &[&str]) -> Option<String> {
+    if cmd.is_empty() {
+        return None;
+    }
+
+    let prog = cmd[0].rsplit('/').next().unwrap_or("").to_lowercase();
+    if !["ssh", "mosh", "scp", "rsync"].contains(&prog.as_str()) {
+        return None;
+    }
+
+    // Dumber: last non-option arg that is not the prog itself and not localhost
+    let prog_name = prog.as_str();
+    for arg in cmd.iter().rev() {
+        if !arg.starts_with('-') {
+            let base = arg.rsplit('/').next().unwrap_or(arg);
+            if base == prog_name || base == "localhost" {
+                continue;
+            }
+            let mut h = *arg;
+            if let Some((_, rest)) = h.split_once('@') {
+                h = rest;
+            }
+            if let Some((host, _)) = h.split_once(':') {
+                h = host;
+            }
+            if !h.is_empty() {
+                return Some(h.to_string());
+            }
+        }
+    }
+
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -168,5 +208,22 @@ mod tests {
                 home
             );
         }
+    }
+
+    #[test]
+    fn test_extract_remote_host() {
+        // Dumber: last non-option arg (cleaned). Stability in caller handles fast cmds.
+        assert_eq!(extract_remote_host(&["ssh", "host"]), Some("host".into()));
+        assert_eq!(extract_remote_host(&["ssh", "user@host"]), Some("host".into()));
+        assert_eq!(extract_remote_host(&["ssh", "-p", "2222", "host"]), Some("host".into()));
+        assert_eq!(extract_remote_host(&["/usr/bin/ssh", "host"]), Some("host".into()));
+        assert_eq!(extract_remote_host(&["mosh", "host"]), Some("host".into()));
+        assert_eq!(extract_remote_host(&["ssh", "host", "ls"]), Some("ls".into()));
+        assert_eq!(extract_remote_host(&["scp", "file", "host:dest"]), Some("host".into()));
+        assert_eq!(extract_remote_host(&["rsync", "dest", "host:src"]), Some("host".into()));
+
+        // Negative
+        assert_eq!(extract_remote_host(&["ssh", "localhost"]), None);
+        assert_eq!(extract_remote_host(&["ls", "-l"]), None);
     }
 }

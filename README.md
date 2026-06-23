@@ -130,6 +130,7 @@ These are [Nerd Font](https://www.nerdfonts.com/) icons. Make sure your terminal
 | `short_git_root` | String or undefined | Last component of the git repository root path |
 | `git_root` | String or undefined | Full path to the git repository root |
 | `program` | String or undefined | Currently running program (e.g., `nvim`, `claude`, `opencode`) |
+| `host` | String or undefined | Remote hostname (from persistent ssh/mosh sessions) |
 | `status` | String | Pane activity status (freeform, set via pipe). Defaults: `idle`, `running`, `pending`, `done`, `error`. |
 
 All variables are also available scoped to specific panes:
@@ -177,6 +178,10 @@ format "{{ short_dir }}{% if program %} [{{ program }}]{% endif %}"
 // Multi-pane - show first and second pane directories
 format "{{ short_dir }}{% if pane[1] %} | {{ pane[1].short_dir }}{% endif %}"
 // => my-project | docs
+
+// Remote hostname (SSH)
+format "{% if host %}{{ host }}{% else %}{{ short_dir }}{% endif %}"
+// => my-server
 
 ```
 

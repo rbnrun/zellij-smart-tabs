@@ -184,6 +184,7 @@ fn render_help(rows: usize, cols: usize, scroll: usize, config: &Config) {
         "  {{ short_git_root }}  Last component of git root",
     ));
     lines.push(Text::new("  {{ program }}         Running program name"));
+    lines.push(Text::new("  {{ host }}            Remote hostname (ssh/mosh)"));
     lines.push(Text::new(" "));
     lines.push(Text::new("Pane-scoped access:").dim_all());
     lines.push(Text::new("  {{ pane.last.program }}         Last pane"));

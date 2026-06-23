@@ -77,10 +77,11 @@ Built per-tab from both stores:
 ```json
 {
   "short_dir": "my-project",
-  "cwd": "/home/user/my-project",
+  "cwd": "~/work/projects/my-project",  // may be truncated via path_depth
   "short_git_root": "my-project",
-  "git_root": "/home/user/my-project",
+  "git_root": "~/my-project",
   "program": "nvim",
+  "host": "remotehost",
   "status": "running",
 
   "pane": [

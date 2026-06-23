@@ -16,7 +16,7 @@ use host::ZellijHost;
 
 use log::{debug, error, warn};
 use tab_state::{PaneState, PaneStore, TabStore};
-use utils::{extract_program, parse_git_root, truncate_path};
+use utils::{extract_program, extract_remote_host, parse_git_root, truncate_path};
 
 const CTX_PANE_ID: &str = "pane_id";
 const CTX_COMMAND_TYPE: &str = "command_type";
@@ -167,12 +167,20 @@ impl ZellijSmartTabsPlugin {
                     None => full.clone(),
                 }
             });
+            let host = p.terminal_command.as_deref()
+                .or(p.running_command.as_deref())
+                .and_then(|s| {
+                    let tokens: Vec<&str> = s.split_whitespace().collect();
+                    extract_remote_host(&tokens)
+                });
+
             serde_json::json!({
                 "cwd": cwd,
                 "short_dir": p.short_dir,
                 "git_root": p.git_root,
                 "short_git_root": p.short_git_root,
                 "program": p.program,
+                "host": host,
                 "status": status,
             })
         };
@@ -300,6 +308,13 @@ impl ZellijSmartTabsPlugin {
                     None
                 };
 
+                let host = if let Some(tc) = &pane.terminal_command {
+                    let tokens: Vec<&str> = tc.split_whitespace().collect();
+                    extract_remote_host(&tokens)
+                } else {
+                    None
+                };
+
                 if let Some(existing) = self.pane_store.panes.get_mut(&pane.id) {
                     let mut changed = false;
                     if existing.tab_id != tab.tab_id {
@@ -317,6 +332,12 @@ impl ZellijSmartTabsPlugin {
                     if is_command_pane && existing.program != program {
                         existing.program = program;
                         changed = true;
+                    }
+                    if is_command_pane {
+                        if existing.host != host {
+                            existing.host = host;
+                            changed = true;
+                        }
                     }
                     // Apply on_focus when both tab and pane are focused (one-shot: take clears it)
                     if pane.is_focused && tab.is_active {
@@ -345,6 +366,8 @@ impl ZellijSmartTabsPlugin {
                             program,
                             terminal_command: pane.terminal_command.clone(),
                             running_command: None,
+                            host,
+                            pending_host: None,
                             status: tab_state::DEFAULT_STATUS.to_string(),
                             on_focus: None,
                         },
@@ -482,13 +505,39 @@ impl ZellijSmartTabsPlugin {
         for pane_id in pane_ids {
             let raw_cmd = self.host.get_pane_running_command(pane_id).ok();
             let running_command = raw_cmd.as_ref().map(|cmd| cmd.join(" "));
+
+            let current_host = raw_cmd.as_ref().and_then(|cmd| {
+                let tokens: Vec<&str> = cmd.iter().map(|s| s.as_str()).collect();
+                extract_remote_host(&tokens)
+            });
+
             let raw_program = raw_cmd.and_then(|cmd| {
                 let tokens: Vec<&str> = cmd.iter().map(|s| s.as_str()).collect();
                 extract_program(&tokens, &self.config().skip_programs)
             });
             let new_program = self.substitute_program(raw_program);
+
             if let Some(pane) = self.pane_store.panes.get_mut(&pane_id) {
                 pane.running_command = running_command;
+
+                // Small timeout adoption for remote hosts to avoid flickering on fast commands.
+                if let Some(pending) = pane.pending_host.take() {
+                    if current_host.as_ref() == Some(&pending) {
+                        if pane.host != current_host {
+                            pane.host = current_host.clone();
+                            changed_tabs.insert(pane.tab_id);
+                        }
+                    }
+                    // else: command changed before timeout, drop the pending host
+                } else if current_host.is_some() && pane.host.is_none() {
+                    // First time seeing this host → wait a bit to confirm it's not a flash command
+                    pane.pending_host = current_host;
+                    self.host.set_timeout(1.5);
+                } else if current_host != pane.host {
+                    pane.host = current_host;
+                    changed_tabs.insert(pane.tab_id);
+                }
+
                 if pane.program != new_program {
                     debug!(pane_id = pane_id, program = format!("{:?}", new_program).as_str(); "program changed");
                     changed_tabs.insert(pane.tab_id);
