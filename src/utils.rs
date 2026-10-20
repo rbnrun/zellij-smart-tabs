@@ -7,40 +7,17 @@ pub fn short_path(path: &str) -> String {
         .to_string()
 }
 
-/// Return the last `depth` non-empty path components joined by `/`.
-/// Always returns a relative-style segment string (no leading `/`).
-/// Used as a building block by `truncate_path`.
+/// Keep only the last `depth` path components of a display path, joined by `/`.
+///
+/// A `depth` of 0 means unlimited. Paths with `depth` or fewer components are
+/// returned unchanged, so a leading `/` or `~` is kept. Truncated paths are
+/// relative (no leading `/` or `~`).
 pub fn tail_path(path: &str, depth: usize) -> String {
-    if depth == 0 {
-        return String::new();
-    }
     let components: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
-    if components.is_empty() {
+    if depth == 0 || components.len() <= depth {
         return path.to_string();
     }
-    if components.len() <= depth {
-        components.join("/")
-    } else {
-        components[components.len() - depth..].join("/")
-    }
-}
-
-/// Truncate a display path (which may be absolute like `/usr` or tilded like `~/foo`)
-/// to at most the last `depth` components.
-///
-/// If the path has `depth` or fewer components, the original string is returned
-/// unchanged (preserving leading `/` or `~` formatting).
-/// Otherwise only the tail is returned.
-pub fn truncate_path(path: &str, depth: usize) -> String {
-    if depth == 0 {
-        return String::new();
-    }
-    let components: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
-    if components.len() <= depth {
-        path.to_string()
-    } else {
-        tail_path(path, depth)
-    }
+    components[components.len() - depth..].join("/")
 }
 
 pub fn parse_git_root(stdout: &[u8]) -> Option<String> {
@@ -95,33 +72,22 @@ mod tests {
 
     #[test]
     fn test_tail_path() {
-        // tail_path always produces a relative segment string (no leading / or ~ prefix)
-        assert_eq!(tail_path("/home/user/Projects/my-project", 2), "Projects/my-project");
-        assert_eq!(tail_path("~/Projects/foo/bar", 1), "bar");
+        // depth 0 means unlimited
+        assert_eq!(tail_path("/usr/local/bin", 0), "/usr/local/bin");
+        assert_eq!(tail_path("~/Projects/my-project", 0), "~/Projects/my-project");
+
+        // depth or fewer components: unchanged, keeps leading / or ~
+        assert_eq!(tail_path("/", 10), "/");
         assert_eq!(tail_path("~", 1), "~");
-        assert_eq!(tail_path("/usr", 1), "usr");
+        assert_eq!(tail_path("/usr", 1), "/usr");
+        assert_eq!(tail_path("/usr/local/bin", 3), "/usr/local/bin");
+        assert_eq!(tail_path("~/Projects/my-project", 3), "~/Projects/my-project");
+
+        // more components than depth: last `depth` components only
         assert_eq!(tail_path("/usr/local/bin", 1), "bin");
         assert_eq!(tail_path("/usr/local/bin", 2), "local/bin");
-        assert_eq!(tail_path("/home/user/Projects/my-project", 1), "my-project");
-        assert_eq!(tail_path("/", 5), "/"); // empty components case
-    }
-
-    #[test]
-    fn test_truncate_path() {
-        // When <= depth components, returns original unchanged (preserves / and ~)
-        assert_eq!(truncate_path("/usr", 1), "/usr");
-        assert_eq!(truncate_path("/mnt", 5), "/mnt");
-        assert_eq!(truncate_path("/usr/local/bin", 3), "/usr/local/bin");
-        assert_eq!(truncate_path("/usr/local/bin", 10), "/usr/local/bin");
-        assert_eq!(truncate_path("/", 10), "/");
-        assert_eq!(truncate_path("~/foo", 5), "~/foo");
-        assert_eq!(truncate_path("~/Projects/my-project", 3), "~/Projects/my-project");
-
-        // When truncating, uses tail (no root prefix)
-        assert_eq!(truncate_path("/usr/local/bin", 1), "bin");
-        assert_eq!(truncate_path("/usr/local/bin", 2), "local/bin");
-        assert_eq!(truncate_path("/home/user/Projects/my-project", 2), "Projects/my-project");
-        assert_eq!(truncate_path("~/Projects/foo/bar", 1), "bar");
+        assert_eq!(tail_path("/home/user/Projects/my-project", 2), "Projects/my-project");
+        assert_eq!(tail_path("~/Projects/foo/bar", 1), "bar");
     }
 
     #[test]

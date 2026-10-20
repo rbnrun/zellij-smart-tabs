@@ -44,7 +44,7 @@ pub struct Config {
     pub format_error: Option<String>,
     pub poll_interval: f64,
     pub debounce: f64,
-    pub path_depth: Option<usize>,
+    pub path_depth: usize,
     pub debug: bool,
     pub substitutions: Substitutions,
     pub skip_programs: HashSet<String>,
@@ -73,7 +73,7 @@ impl Config {
         let path_depth = map
             .get("path_depth")
             .and_then(|v| v.trim().parse::<usize>().ok())
-            .filter(|&n| n >= 1);
+            .unwrap_or(0);
 
         let debug = map
             .get("debug")
@@ -172,7 +172,7 @@ mod tests {
         assert!(c.format.contains("short_dir"));
         assert_eq!(c.poll_interval, 5.0);
         assert_eq!(c.debounce, 0.2);
-        assert_eq!(c.path_depth, None);
+        assert_eq!(c.path_depth, 0);
         // Default substitutions are populated
         let defaults = Substitutions::default();
         assert_eq!(
@@ -225,9 +225,9 @@ mod tests {
 
     #[test]
     fn test_path_depth_config() {
-        assert_eq!(config_with(&[("path_depth", "3")]).path_depth, Some(3));
-        assert_eq!(config_with(&[("path_depth", "0")]).path_depth, None);
-        assert_eq!(config_with(&[("path_depth", "x")]).path_depth, None);
+        assert_eq!(config_with(&[("path_depth", "3")]).path_depth, 3);
+        assert_eq!(config_with(&[("path_depth", "0")]).path_depth, 0);
+        assert_eq!(config_with(&[("path_depth", "x")]).path_depth, 0);
     }
 
     #[test]

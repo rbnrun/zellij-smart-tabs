@@ -210,10 +210,10 @@ fn render_help(rows: usize, cols: usize, scroll: usize, config: &Config) {
     )));
     lines.push(Text::new(format!(
         "  path_depth:    Trailing dir components for cwd (current: {})",
-        config
-            .path_depth
-            .map(|n| n.to_string())
-            .unwrap_or_else(|| "unset (full path)".into())
+        match config.path_depth {
+            0 => "0 (full path)".to_string(),
+            n => n.to_string(),
+        }
     )));
     lines.push(Text::new(format!(
         "  debug:         Enable debug logging (current: {})",

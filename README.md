@@ -72,7 +72,7 @@ All configuration is inline in the plugin block.
 | `format` | String | See [Format Gallery](#format-gallery) | Tab name template (Jinja2-like syntax) |
 | `poll_interval` | Number (seconds) | `5` | Timer fallback interval for polling |
 | `debounce` | Number (seconds) | `0.2` | Delay before applying tab rename after data changes |
-| `path_depth` | Number | unset | Limit number of directories shown |
+| `path_depth` | Number | `0` | Limit number of directories shown (`0` = full path) |
 | `debug` | Bool | `true` | Enable debug logging to Zellij log |
 | `sub` | Block | - | Substitution rules (see below) |
 
